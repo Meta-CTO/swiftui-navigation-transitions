@@ -250,9 +250,7 @@ extension UINavigationController {
 		// Track gesture state for completion/cancellation detection
 		let state = gestureRecognizer.state
 		let velocity = gestureRecognizer.velocity(in: view).x
-		
-		print("📍 Native gesture - Progress: \(String(format: "%.2f", progress)), State: \(state.rawValue), Velocity: \(String(format: "%.0f", velocity))")
-		
+				
 		// Call the alongside handler with our custom progress and gesture state
 		alongsideHandler(operation, coordinator, progress, state)
 		
@@ -260,7 +258,6 @@ extension UINavigationController {
 		if state == .ended || state == .cancelled || state == .failed {
 			// Predict if gesture will complete or cancel based on progress and velocity
 			let willComplete = (velocity > 675) || (progress >= 0.2 && velocity > -200)
-			print("📍 Gesture ending - Will complete: \(willComplete)")
 		}
 	}
 	
