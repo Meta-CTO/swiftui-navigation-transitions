@@ -103,6 +103,8 @@ extension AnyNavigationTransition {
                 
             case .pop:
                 if context.isCancelled {
+                    guard fromVC?.hidesTabBarWhenPushed ?? false else { return }
+                    
                     tabBar.isHidden = true
                     
                     DispatchQueue.main.asyncAfter(deadline: .now() + context.transitionDuration) {
