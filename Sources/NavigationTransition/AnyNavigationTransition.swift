@@ -66,3 +66,62 @@ extension AnyNavigationTransition {
 		return copy
 	}
 }
+
+extension UIViewController {
+    private enum HideTabBarKey {
+        @MainActor static var hidesTabBarKey: UInt8 = 10
+    }
+    
+    public var hidesTabBarWhenPushed: Bool {
+        get {
+            return objc_getAssociatedObject(self, &HideTabBarKey.hidesTabBarKey) as? Bool ?? false
+        }
+        set {
+            objc_setAssociatedObject(self, &HideTabBarKey.hidesTabBarKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        }
+    }
+}
+
+extension AnyNavigationTransition {
+    @MainActor
+    public static func withTabBarAnimation() -> AnyNavigationTransition {
+        return .default.alongsideDefault { operation, context, customProgress, gestureState in
+            let fromVC = context.viewController(forKey: .from)
+            let toVC = context.viewController(forKey: .to)
+            guard let tabBar = fromVC?.tabBarController?.tabBar ?? toVC?.tabBarController?.tabBar else { return }
+            
+            let screenWidth = UIScreen.main.bounds.width
+            let shouldHideTabBar = toVC?.hidesTabBarWhenPushed ?? false
+            
+            switch operation {
+            case .push:
+                if shouldHideTabBar {
+                    tabBar.frame.origin.x = -screenWidth
+                } else if !(fromVC?.hidesTabBarWhenPushed ?? false) {
+                    tabBar.frame.origin.x = 0
+                }
+                
+            case .pop:
+                if context.isCancelled {
+                    tabBar.isHidden = true
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + context.transitionDuration) {
+                        tabBar.frame.origin.x = -screenWidth
+                        tabBar.isHidden = false
+                    }
+                } else {
+                    let progress = customProgress ?? context.percentComplete
+                    if !shouldHideTabBar {
+                        if progress == 0 {
+                            tabBar.frame.origin.x = 0
+                            tabBar.isHidden = false
+                        }
+                    }
+                }
+                
+            @unknown default:
+                break
+            }
+        }
+    }
+}

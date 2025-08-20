@@ -17,3 +17,15 @@ extension View {
 		}
 	}
 }
+
+extension View {
+    @MainActor
+    public func hidesTabBarWhenPushed(_ hidden: Bool = true) -> some View {
+        self.introspect(
+            .viewController,
+            on: .iOS(.v13...), .tvOS(.v13...), .visionOS(.v1...)
+        ) { viewController in
+            viewController.hidesTabBarWhenPushed = hidden
+        }
+    }
+}
