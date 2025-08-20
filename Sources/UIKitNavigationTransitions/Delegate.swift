@@ -7,6 +7,9 @@ final class NavigationTransitionDelegate: NSObject, UINavigationControllerDelega
 	var transition: AnyNavigationTransition
 	private weak var baseDelegate: (any UINavigationControllerDelegate)?
 	var interactionController: UIPercentDrivenInteractiveTransition?
+	private var previousViewControllerCount: Int = 0
+	private(set) var currentCoordinator: (any UIViewControllerTransitionCoordinator)?
+	private(set) var currentOperation: NavigationTransitionOperation?
 
 	init(transition: AnyNavigationTransition, baseDelegate: (any UINavigationControllerDelegate)?) {
 		self.transition = transition
@@ -15,6 +18,34 @@ final class NavigationTransitionDelegate: NSObject, UINavigationControllerDelega
 
 	func navigationController(_ navigationController: UINavigationController, willShow viewController: UIViewController, animated: Bool) {
 		baseDelegate?.navigationController?(navigationController, willShow: viewController, animated: animated)
+		
+		// Handle alongside animations for default transitions
+		if transition.isDefault,
+		   let alongsideHandler = transition.alongsideHandler,
+		   animated,
+		   let coordinator = navigationController.transitionCoordinator {
+			
+			// Determine operation (push or pop)
+			let currentCount = navigationController.viewControllers.count
+			let isPush = currentCount > previousViewControllerCount
+			let operation: NavigationTransitionOperation = isPush ? .push : .pop
+			
+			// Store for interactive gesture updates
+			self.currentCoordinator = coordinator
+			self.currentOperation = operation
+			
+			// Run alongside animation using iOS's coordinator
+			coordinator.animate(alongsideTransition: { context in
+				alongsideHandler(operation, context, nil, nil)
+			}, completion: { _ in
+				// Clean up
+				self.currentCoordinator = nil
+				self.currentOperation = nil
+			})
+		}
+		
+		// Update count for next time
+		previousViewControllerCount = navigationController.viewControllers.count
 	}
 
 	func navigationController(_ navigationController: UINavigationController, didShow viewController: UIViewController, animated: Bool) {

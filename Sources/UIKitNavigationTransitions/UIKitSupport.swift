@@ -195,8 +195,16 @@ extension UINavigationController {
 				exclusivelyEnableGestureRecognizer(.none)
 			case .edgePan:
 				exclusivelyEnableGestureRecognizer(defaultEdgePanRecognizer)
+				// Add target to track native gesture progress
+				if !defaultEdgePanRecognizer.hasTarget(self, action: #selector(trackNativeGesture)) {
+					defaultEdgePanRecognizer.addTarget(self, action: #selector(trackNativeGesture))
+				}
 			case .pan:
 				exclusivelyEnableGestureRecognizer(defaultPanRecognizer)
+				// Add target to track native gesture progress
+				if !defaultPanRecognizer.hasTarget(self, action: #selector(trackNativeGesture)) {
+					defaultPanRecognizer.addTarget(self, action: #selector(trackNativeGesture))
+				}
 			}
 		} else {
 			switch interactivity {
@@ -225,6 +233,37 @@ extension UINavigationController {
 }
 
 extension UINavigationController {
+	@objc func trackNativeGesture(_ gestureRecognizer: UIPanGestureRecognizer) {
+		guard let delegate = customDelegate,
+			  delegate.transition.isDefault,
+			  let alongsideHandler = delegate.transition.alongsideHandler,
+			  let coordinator = delegate.currentCoordinator,
+			  let operation = delegate.currentOperation else {
+			return
+		}
+		
+		// Calculate progress from gesture
+		let translation = gestureRecognizer.translation(in: view).x
+		let width = view.bounds.width
+		let progress = min(max(translation / width, 0), 1)
+		
+		// Track gesture state for completion/cancellation detection
+		let state = gestureRecognizer.state
+		let velocity = gestureRecognizer.velocity(in: view).x
+		
+		print("📍 Native gesture - Progress: \(String(format: "%.2f", progress)), State: \(state.rawValue), Velocity: \(String(format: "%.0f", velocity))")
+		
+		// Call the alongside handler with our custom progress and gesture state
+		alongsideHandler(operation, coordinator, progress, state)
+		
+		// Handle gesture ending states
+		if state == .ended || state == .cancelled || state == .failed {
+			// Predict if gesture will complete or cancel based on progress and velocity
+			let willComplete = (velocity > 675) || (progress >= 0.2 && velocity > -200)
+			print("📍 Gesture ending - Will complete: \(willComplete)")
+		}
+	}
+	
 	@objc private func setViewControllers_animateIfNeeded(_ viewControllers: [UIViewController], animated: Bool) {
 		if let transitionDelegate = customDelegate {
 			setViewControllers_animateIfNeeded(viewControllers, animated: transitionDelegate.transition.animation != nil)
@@ -286,6 +325,22 @@ extension UINavigationController {
 	var panRecognizer: UIPanGestureRecognizer! {
 		get { self[] }
 		set { self[] = newValue }
+	}
+}
+
+extension UIGestureRecognizer {
+	func hasTarget(_ target: Any, action: Selector) -> Bool {
+		// Check if this gesture recognizer already has the specified target/action
+		if let targets = self.value(forKey: "targets") as? [Any] {
+			for targetActionPair in targets {
+				if let targetInfo = targetActionPair as? NSObject,
+				   let storedTarget = targetInfo.value(forKey: "target") as? NSObject,
+				   storedTarget === (target as AnyObject) {
+					return true
+				}
+			}
+		}
+		return false
 	}
 }
 
