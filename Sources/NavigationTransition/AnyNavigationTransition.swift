@@ -111,11 +111,9 @@ extension AnyNavigationTransition {
                     }
                 } else {
                     let progress = customProgress ?? context.percentComplete
-                    if !shouldHideTabBar {
-                        if progress == 0 {
-                            tabBar.frame.origin.x = 0
-                            tabBar.isHidden = false
-                        }
+                    if progress.isZero && !shouldHideTabBar {
+                        tabBar.frame.origin.x = 0
+                        tabBar.isHidden = false
                     }
                 }
                 
